@@ -48,7 +48,7 @@
 					db_new = true;
 				}
 			}
-			if (next) return next();
+			if (next) return next(returnValue(db));
 		} else {
 			storage.get(db_id, function(items) {
 				db = items[db_id];
@@ -59,13 +59,14 @@
 						db = {tables: {}, data: {}};
 						commit(function() {
 							db_new = true;
-							return next();
+							return next(returnValue(db));
 						});
 					}
 				}
-				return next();
+				return next(returnValue(db));
 			});
 		}
+
 
 
 		// ______________________ private methods
@@ -204,7 +205,7 @@
 					results.sort(sort_results(sort[i][0], sort[i].length > 1 ? sort[i][1] : null));
 				}
 			}
-			
+
 			// distinct params
 			if(distinct && distinct instanceof Array) {
 				for(var j=0; j<distinct.length; j++) {
@@ -443,138 +444,61 @@
 			return new_data;
 		}
 
-		// ______________________ public methods
+		function returnValue(db) {
+			// ______________________ public methods
 
-		return {
-			// commit the database to localStorage
-			commit: function(next) {
-				return commit(next);
-			},
+			return {
+				// commit the database to localStorage
+				commit: function(next) {
+					return commit(next);
+				},
 
-			// is this instance a newly created database?
-			isNew: function() {
-				return db_new;
-			},
+				// is this instance a newly created database?
+				isNew: function() {
+					return db_new;
+				},
 
-			// delete the database
-			drop: function() {
-				drop();
-			},
+				// delete the database
+				drop: function() {
+					drop();
+				},
 
-			// serialize the database
-			serialize: function() {
-				return serialize();
-			},
+				// serialize the database
+				serialize: function() {
+					return serialize();
+				},
 
-			// check whether a table exists
-			tableExists: function(table_name) {
-				return tableExists(table_name);
-			},
+				// check whether a table exists
+				tableExists: function(table_name) {
+					return tableExists(table_name);
+				},
 
-			// list of keys in a table
-			tableFields: function(table_name) {
-				return tableFields(table_name);
-			},
+				// list of keys in a table
+				tableFields: function(table_name) {
+					return tableFields(table_name);
+				},
 
-			// number of tables in the database
-			tableCount: function() {
-				return tableCount();
-			},
+				// number of tables in the database
+				tableCount: function() {
+					return tableCount();
+				},
 
-			columnExists: function(table_name, field_name){
-				return columnExists(table_name, field_name);
-			},
+				columnExists: function(table_name, field_name){
+					return columnExists(table_name, field_name);
+				},
 
-			// create a table
-			createTable: function(table_name, fields) {
-				var result = false;
-				if(!validateName(table_name)) {
-					error("The database name '" + table_name + "' contains invalid characters.");
-				} else if(this.tableExists(table_name)) {
-					error("The table name '" + table_name + "' already exists.");
-				} else {
-					// make sure field names are valid
-					var is_valid = true;
-					for(var i=0; i<fields.length; i++) {
-						if(!validateName(fields[i])) {
-							is_valid = false;
-							break;
-						}
-					}
-
-					if(is_valid) {
-						// cannot use indexOf due to <IE9 incompatibility
-						// de-duplicate the field list
-						var fields_literal = {};
-						for(var i=0; i<fields.length; i++) {
-							fields_literal[ fields[i] ] = true;
-						}
-						delete fields_literal['ID']; // ID is a reserved field name
-
-						fields = ['ID'];
-						for(var field in fields_literal) {
-							if( fields_literal.hasOwnProperty(field) ) {
-								fields.push(field);
-							}
-						}
-
-						createTable(table_name, fields);
-						result = true;
+				// create a table
+				createTable: function(table_name, fields) {
+					var result = false;
+					if(!validateName(table_name)) {
+						error("The database name '" + table_name + "' contains invalid characters.");
+					} else if(this.tableExists(table_name)) {
+						error("The table name '" + table_name + "' already exists.");
 					} else {
-						error("One or more field names in the table definition contains invalid characters");
-					}
-				}
-
-				return result;
-			},
-
-			// Create a table using array of Objects @ [{k:v,k:v},{k:v,k:v},etc]
-			createTableWithData: function(table_name, data, next) {
-				if(typeof data !== 'object' || !data.length || data.length < 1) {
-					error("Data supplied isn't in object form. Example: [{k:v,k:v},{k:v,k:v} ..]");
-				}
-
-				var fields = Object.keys(data[0]);
-
-				// create the table
-				if( this.createTable(table_name, fields) ) {
-					this.commit(function() {
-
-						// populate
-						for (var i=0; i<data.length; i++) {
-							if( !insert(table_name, data[i]) ) {
-								error("Failed to insert record: [" + JSON.stringify(data[i]) + "]");
-							}
-						}
-						this.commit(next);
-					});
-				}
-				return true;
-			},
-
-			// drop a table
-			dropTable: function(table_name) {
-				tableExistsWarn(table_name);
-				dropTable(table_name);
-			},
-
-			// empty a table
-			truncate: function(table_name) {
-				tableExistsWarn(table_name);
-				truncate(table_name);
-			},
-
-			// alter a table
-			alterTable: function(table_name, new_fields, default_values) {
-				var result = false;
-				if(!validateName(table_name)) {
-					error("The database name '" + table_name + "' contains invalid characters");
-				} else {
-					if(typeof new_fields == "object") {
 						// make sure field names are valid
 						var is_valid = true;
-						for(var i=0; i<new_fields.length; i++) {
-							if(!validateName(new_fields[i])) {
+						for(var i=0; i<fields.length; i++) {
+							if(!validateName(fields[i])) {
 								is_valid = false;
 								break;
 							}
@@ -584,140 +508,220 @@
 							// cannot use indexOf due to <IE9 incompatibility
 							// de-duplicate the field list
 							var fields_literal = {};
-							for(var i=0; i<new_fields.length; i++) {
-								fields_literal[ new_fields[i] ] = true;
+							for(var i=0; i<fields.length; i++) {
+								fields_literal[ fields[i] ] = true;
 							}
 							delete fields_literal['ID']; // ID is a reserved field name
 
-							new_fields = [];
+							fields = ['ID'];
 							for(var field in fields_literal) {
 								if( fields_literal.hasOwnProperty(field) ) {
-									new_fields.push(field);
+									fields.push(field);
 								}
 							}
 
-							alterTable(table_name, new_fields, default_values);
-							result = true;
-						} else {
-							error("One or more field names in the table definition contains invalid characters");
-						}
-					} else if(typeof new_fields == "string") {
-						if(validateName(new_fields)) {
-							var new_fields_array = [];
-							new_fields_array.push(new_fields);
-							alterTable(table_name, new_fields_array, default_values);
+							createTable(table_name, fields);
 							result = true;
 						} else {
 							error("One or more field names in the table definition contains invalid characters");
 						}
 					}
-				}
 
-				return result;
-			},
+					return result;
+				},
 
-			// number of rows in a table
-			rowCount: function(table_name) {
-				tableExistsWarn(table_name);
-				return rowCount(table_name);
-			},
+				// Create a table using array of Objects @ [{k:v,k:v},{k:v,k:v},etc]
+				createTableWithData: function(table_name, data, next) {
+					if(typeof data !== 'object' || !data.length || data.length < 1) {
+						error("Data supplied isn't in object form. Example: [{k:v,k:v},{k:v,k:v} ..]");
+					}
 
-			// insert a row
-			insert: function(table_name, data) {
-				tableExistsWarn(table_name);
-				return insert(table_name, validateData(table_name, data) );
-			},
+					var fields = Object.keys(data[0]);
 
-			// insert or update based on a given condition
-			insertOrUpdate: function(table_name, query, data) {
-				tableExistsWarn(table_name);
+					// create the table
+					if( this.createTable(table_name, fields) ) {
+						this.commit(function() {
 
-				var result_ids = [];
-				if(!query) {
-					result_ids = getIDs(table_name);				// there is no query. applies to all records
-				} else if(typeof query == 'object') {				// the query has key-value pairs provided
-					result_ids = queryByValues(table_name, validFields(table_name, query));
-				} else if(typeof query == 'function') {				// the query has a conditional map function provided
-					result_ids = queryByFunction(table_name, query);
-				}
-
-				// no existing records matched, so insert a new row
-				if(result_ids.length == 0) {
-					return insert(table_name, validateData(table_name, data) );
-				} else {
-					var ids = [];
-					for(var n=0; n<result_ids.length; n++) {
-						update(table_name, result_ids, function(o) {
-							ids.push(o.ID);
-							return data;
+							// populate
+							for (var i=0; i<data.length; i++) {
+								if( !insert(table_name, data[i]) ) {
+									error("Failed to insert record: [" + JSON.stringify(data[i]) + "]");
+								}
+							}
+							this.commit(next);
 						});
 					}
+					return true;
+				},
 
-					return ids;
+				// drop a table
+				dropTable: function(table_name) {
+					tableExistsWarn(table_name);
+					dropTable(table_name);
+				},
+
+				// empty a table
+				truncate: function(table_name) {
+					tableExistsWarn(table_name);
+					truncate(table_name);
+				},
+
+				// alter a table
+				alterTable: function(table_name, new_fields, default_values) {
+					var result = false;
+					if(!validateName(table_name)) {
+						error("The database name '" + table_name + "' contains invalid characters");
+					} else {
+						if(typeof new_fields == "object") {
+							// make sure field names are valid
+							var is_valid = true;
+							for(var i=0; i<new_fields.length; i++) {
+								if(!validateName(new_fields[i])) {
+									is_valid = false;
+									break;
+								}
+							}
+
+							if(is_valid) {
+								// cannot use indexOf due to <IE9 incompatibility
+								// de-duplicate the field list
+								var fields_literal = {};
+								for(var i=0; i<new_fields.length; i++) {
+									fields_literal[ new_fields[i] ] = true;
+								}
+								delete fields_literal['ID']; // ID is a reserved field name
+
+								new_fields = [];
+								for(var field in fields_literal) {
+									if( fields_literal.hasOwnProperty(field) ) {
+										new_fields.push(field);
+									}
+								}
+
+								alterTable(table_name, new_fields, default_values);
+								result = true;
+							} else {
+								error("One or more field names in the table definition contains invalid characters");
+							}
+						} else if(typeof new_fields == "string") {
+							if(validateName(new_fields)) {
+								var new_fields_array = [];
+								new_fields_array.push(new_fields);
+								alterTable(table_name, new_fields_array, default_values);
+								result = true;
+							} else {
+								error("One or more field names in the table definition contains invalid characters");
+							}
+						}
+					}
+
+					return result;
+				},
+
+				// number of rows in a table
+				rowCount: function(table_name) {
+					tableExistsWarn(table_name);
+					return rowCount(table_name);
+				},
+
+				// insert a row
+				insert: function(table_name, data) {
+					tableExistsWarn(table_name);
+					return insert(table_name, validateData(table_name, data) );
+				},
+
+				// insert or update based on a given condition
+				insertOrUpdate: function(table_name, query, data) {
+					tableExistsWarn(table_name);
+
+					var result_ids = [];
+					if(!query) {
+						result_ids = getIDs(table_name);				// there is no query. applies to all records
+					} else if(typeof query == 'object') {				// the query has key-value pairs provided
+						result_ids = queryByValues(table_name, validFields(table_name, query));
+					} else if(typeof query == 'function') {				// the query has a conditional map function provided
+						result_ids = queryByFunction(table_name, query);
+					}
+
+					// no existing records matched, so insert a new row
+					if(result_ids.length == 0) {
+						return insert(table_name, validateData(table_name, data) );
+					} else {
+						var ids = [];
+						for(var n=0; n<result_ids.length; n++) {
+							update(table_name, result_ids, function(o) {
+								ids.push(o.ID);
+								return data;
+							});
+						}
+
+						return ids;
+					}
+				},
+
+				// update rows
+				update: function(table_name, query, update_function) {
+					tableExistsWarn(table_name);
+
+					var result_ids = [];
+					if(!query) {
+						result_ids = getIDs(table_name);				// there is no query. applies to all records
+					} else if(typeof query == 'object') {				// the query has key-value pairs provided
+						result_ids = queryByValues(table_name, validFields(table_name, query));
+					} else if(typeof query == 'function') {				// the query has a conditional map function provided
+						result_ids = queryByFunction(table_name, query);
+					}
+					return update(table_name, result_ids, update_function);
+				},
+
+				// select rows
+				query: function(table_name, query, limit, start, sort, distinct) {
+					tableExistsWarn(table_name);
+
+					var result_ids = [];
+					if(!query) {
+						result_ids = getIDs(table_name, limit, start); // no conditions given, return all records
+					} else if(typeof query == 'object') {			// the query has key-value pairs provided
+						result_ids = queryByValues(table_name, validFields(table_name, query), limit, start);
+					} else if(typeof query == 'function') {		// the query has a conditional map function provided
+						result_ids = queryByFunction(table_name, query, limit, start);
+					}
+
+					return select(table_name, result_ids, start, limit, sort, distinct);
+				},
+
+				// alias for query() that takes a dict of params instead of positional arrguments
+				queryAll: function(table_name, params) {
+					if(!params) {
+						return this.query(table_name)
+					} else {
+						return this.query(table_name,
+							params.hasOwnProperty('query') ? params.query : null,
+							params.hasOwnProperty('limit') ? params.limit : null,
+							params.hasOwnProperty('start') ? params.start : null,
+							params.hasOwnProperty('sort') ? params.sort : null,
+							params.hasOwnProperty('distinct') ? params.distinct : null
+						);
+					}
+				},
+
+				// delete rows
+				deleteRows: function(table_name, query) {
+					tableExistsWarn(table_name);
+
+					var result_ids = [];
+					if(!query) {
+						result_ids = getIDs(table_name);
+					} else if(typeof query == 'object') {
+						result_ids = queryByValues(table_name, validFields(table_name, query));
+					} else if(typeof query == 'function') {
+						result_ids = queryByFunction(table_name, query);
+					}
+					return deleteRows(table_name, result_ids);
 				}
-			},
-
-			// update rows
-			update: function(table_name, query, update_function) {
-				tableExistsWarn(table_name);
-
-				var result_ids = [];
-				if(!query) {
-					result_ids = getIDs(table_name);				// there is no query. applies to all records
-				} else if(typeof query == 'object') {				// the query has key-value pairs provided
-					result_ids = queryByValues(table_name, validFields(table_name, query));
-				} else if(typeof query == 'function') {				// the query has a conditional map function provided
-					result_ids = queryByFunction(table_name, query);
-				}
-				return update(table_name, result_ids, update_function);
-			},
-
-			// select rows
-			query: function(table_name, query, limit, start, sort, distinct) {
-				tableExistsWarn(table_name);
-
-				var result_ids = [];
-				if(!query) {
-					result_ids = getIDs(table_name, limit, start); // no conditions given, return all records
-				} else if(typeof query == 'object') {			// the query has key-value pairs provided
-					result_ids = queryByValues(table_name, validFields(table_name, query), limit, start);
-				} else if(typeof query == 'function') {		// the query has a conditional map function provided
-					result_ids = queryByFunction(table_name, query, limit, start);
-				}
-
-				return select(table_name, result_ids, start, limit, sort, distinct);
-			},
-
-			// alias for query() that takes a dict of params instead of positional arrguments
-			queryAll: function(table_name, params) {
-				if(!params) {
-					return this.query(table_name)
-				} else {
-					return this.query(table_name,
-						params.hasOwnProperty('query') ? params.query : null,
-						params.hasOwnProperty('limit') ? params.limit : null,
-						params.hasOwnProperty('start') ? params.start : null,
-						params.hasOwnProperty('sort') ? params.sort : null,
-						params.hasOwnProperty('distinct') ? params.distinct : null
-					);
-				}
-			},
-
-			// delete rows
-			deleteRows: function(table_name, query) {
-				tableExistsWarn(table_name);
-
-				var result_ids = [];
-				if(!query) {
-					result_ids = getIDs(table_name);
-				} else if(typeof query == 'object') {
-					result_ids = queryByValues(table_name, validFields(table_name, query));
-				} else if(typeof query == 'function') {
-					result_ids = queryByFunction(table_name, query);
-				}
-				return deleteRows(table_name, result_ids);
 			}
 		}
+
 	}
 
 	// make amd compatible

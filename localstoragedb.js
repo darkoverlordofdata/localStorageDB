@@ -48,7 +48,7 @@
 					db_new = true;
 				}
 			}
-			return next();
+			if (next) return next();
 		} else {
 			storage.get(db_id, function(items) {
 				db = items[db_id];

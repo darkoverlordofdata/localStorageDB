@@ -48,7 +48,7 @@
 					db_new = true;
 				}
 			}
-			if (next) return next(returnValue(db));
+			if (next) return next(publicInterface(db));
 		} else {
 			storage.get(db_id, function(items) {
 				db = items[db_id];
@@ -59,11 +59,11 @@
 						db = {tables: {}, data: {}};
 						commit(function() {
 							db_new = true;
-							return next(returnValue(db));
+							return next(publicInterface(db));
 						});
 					}
 				}
-				return next(returnValue(db));
+				return next(publicInterface(db));
 			});
 		}
 
@@ -444,7 +444,7 @@
 			return new_data;
 		}
 
-		function returnValue(db) {
+		function publicInterface(db) {
 			// ______________________ public methods
 
 			return {

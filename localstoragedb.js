@@ -27,7 +27,7 @@
 			storage;
 
 			try {
-				if (chrome != null) {
+				if (chrome.storage != null) {
 					storage = (engine == chrome.storage.sync ? chrome.storage.sync: chrome.storage.local);
 				} else {
 					storage = (engine == sessionStorage ? sessionStorage: localStorage);
@@ -37,7 +37,7 @@
 			}
 
 		// if the database doesn't exist, create it
-		if (chrome == null) {
+		if (chrome.storage == null) {
 			db = storage[db_id];
 			if (!( db && (db = JSON.parse(db)) && db.tables && db.data )) {
 				if (!validateName(db_name)) {
@@ -73,7 +73,7 @@
 		// _________ database functions
 		// drop the database
 		function drop(next) {
-			if (chrome == null) {
+			if (chrome.storage == null) {
 				if(storage.hasOwnProperty(db_id)) {
 					delete storage[db_id];
 				}
@@ -377,7 +377,7 @@
 
 		// commit the database to localStorage
 		function commit(next) {
-			if (chrome == null) {
+			if (chrome.storage == null) {
 				try {
 					storage.setItem(db_id, JSON.stringify(db));
 					if (next) return next(true);

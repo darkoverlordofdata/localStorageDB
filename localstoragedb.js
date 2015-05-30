@@ -15,28 +15,56 @@
 */
 
 !(function (_global, undefined) {
-	function localStorageDB(db_name, engine) {
+	function localStorageDB(db_name, engine, next) {
+		if (next == null) {
+			next = engine;
+			engine = null;
+		}
 		var db_prefix = 'db_',
 			db_id = db_prefix + db_name,
 			db_new = false,	// this flag determines whether a new database was created during an object initialisation
-			db = null;
+			db = null,
+			storage;
 
 			try {
-				var storage = (engine == sessionStorage ? sessionStorage: localStorage);
+				if (chrome != null) {
+					storage = (engine == chrome.storage.sync ? chrome.storage.sync: chrome.storage.local);
+				} else {
+					storage = (engine == sessionStorage ? sessionStorage: localStorage);
+				}
 			} catch(e) { // ie8 hack
-				var storage = engine;
+				storage = engine;
 			}
 
 		// if the database doesn't exist, create it
-		db = storage[ db_id ];
-		if( !( db && (db = JSON.parse(db)) && db.tables && db.data ) ) {
-			if(!validateName(db_name)) {
-				error("The name '" + db_name + "' contains invalid characters");
-			} else {
-				db = {tables: {}, data: {}};
-				commit();
-				db_new = true;
+		if (chrome == null) {
+			db = storage[db_id];
+			if (!( db && (db = JSON.parse(db)) && db.tables && db.data )) {
+				if (!validateName(db_name)) {
+					error("The name '" + db_name + "' contains invalid characters");
+				} else {
+					db = {tables: {}, data: {}};
+					commit();
+					db_new = true;
+				}
 			}
+			return next();
+		} else {
+			storage.get(db_id, function(items) {
+				db = items[db_id];
+				if (!( db && (db = JSON.parse(db)) && db.tables && db.data )) {
+					if (!validateName(db_name)) {
+						error("The name '" + db_name + "' contains invalid characters");
+					} else {
+						db = {tables: {}, data: {}};
+						commit(function() {
+							db_new = true;
+							return next();
+						});
+					}
+				}
+				return next();
+			});
 		}
 
 
@@ -44,11 +72,17 @@
 
 		// _________ database functions
 		// drop the database
-		function drop() {
-			if(storage.hasOwnProperty(db_id)) {
-				delete storage[db_id];
+		function drop(next) {
+			if (chrome == null) {
+				if(storage.hasOwnProperty(db_id)) {
+					delete storage[db_id];
+				}
+				db = null;
+				if (next) return next();
+			} else {
+				storage.remove(db_id, next);
+				db = null;
 			}
-			db = null;
 		}
 
 		// number of tables in the database
@@ -342,12 +376,20 @@
 		}
 
 		// commit the database to localStorage
-		function commit() {
-			try {
-				storage.setItem(db_id, JSON.stringify(db));
-				return true;
-			} catch(e) {
-				return false;
+		function commit(next) {
+			if (chrome == null) {
+				try {
+					storage.setItem(db_id, JSON.stringify(db));
+					if (next) return next(true);
+					return true;
+				} catch(e) {
+					if (next) return next(false);
+					return false;
+				}
+			} else {
+				var items = {};
+				items[db_id] = JSON.stringify(db);
+				storage.set(items, next);
 			}
 		}
 
@@ -405,8 +447,8 @@
 
 		return {
 			// commit the database to localStorage
-			commit: function() {
-				return commit();
+			commit: function(next) {
+				return commit(next);
 			},
 
 			// is this instance a newly created database?
@@ -487,7 +529,7 @@
 			},
 
 			// Create a table using array of Objects @ [{k:v,k:v},{k:v,k:v},etc]
-			createTableWithData: function(table_name, data) {
+			createTableWithData: function(table_name, data, next) {
 				if(typeof data !== 'object' || !data.length || data.length < 1) {
 					error("Data supplied isn't in object form. Example: [{k:v,k:v},{k:v,k:v} ..]");
 				}
@@ -496,15 +538,16 @@
 
 				// create the table
 				if( this.createTable(table_name, fields) ) {
-					this.commit();
+					this.commit(function() {
 
-					// populate
-					for (var i=0; i<data.length; i++) {
-						if( !insert(table_name, data[i]) ) {
-							error("Failed to insert record: [" + JSON.stringify(data[i]) + "]");
+						// populate
+						for (var i=0; i<data.length; i++) {
+							if( !insert(table_name, data[i]) ) {
+								error("Failed to insert record: [" + JSON.stringify(data[i]) + "]");
+							}
 						}
-					}
-					this.commit();
+						this.commit(next);
+					});
 				}
 				return true;
 			},
